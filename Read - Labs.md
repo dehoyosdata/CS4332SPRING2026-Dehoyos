@@ -65,7 +65,7 @@ VS Code will be used to:
 
 ## 1.3 Install Git (Windows Only: Git Bash)
 
-Windows users:
+### Windows users:
 
 Install Git from:
 
@@ -84,6 +84,39 @@ Verify:
 ```bash
 git --version
 ```
+
+### Mac Users:
+Open **Terminal** and run:
+
+```bash
+git --version
+```
+
+If a version number appears, Git is already installed. If macOS prompts you to install developer tools, click **Install** - this installs Git through Apple’s Command Line Tools (works natively on Apple Silicon).
+
+If you want to install manually, run:
+
+```bash
+xcode-select --install
+```
+
+Alternatively, download the official macOS installer from [https://git-scm.com/download/mac](https://git-scm.com/download/mac), run the `.dmg`, and complete the setup.
+
+### Linux Users
+I love you guys 💕.
+
+### Configure
+After installation, configure Git:
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your_email@example.com"
+```
+
+### Local Setup
+Now open VSCode and clone a repo: https://github.com/TXSTCODEPLAYGROUND/CS4332SPRING2026.git
+This will prompt you to authenticate. Authenticate via browser loging.
+Note: Some folks might have other browser as default browser, but you might be logged in your GitHub account in different browser. Make sure this is not happening.
 
 ---
 
