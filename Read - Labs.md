@@ -84,6 +84,10 @@ Verify:
 ```bash
 git --version
 ```
+#### Change your VSCode default terminal to GitBash
+- Open VSCode and type `Ctrl+Shift+p`
+- Then in search bar type: `Terminal: Select Default Profile`
+- Then select `Git Bash` from the list (Note. You may not see `Git Bash` if you have not installed it. Install GitBash, restart VSCode and switch) 
 
 ### Mac Users:
 Open **Terminal** and run:
