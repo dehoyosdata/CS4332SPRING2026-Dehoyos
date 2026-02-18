@@ -118,7 +118,7 @@ git config --global user.email "your_email@example.com"
 ```
 
 ### Local Setup
-Now open VSCode and clone a repo: https://github.com/TXSTCODEPLAYGROUND/CS4332SPRING2026.git
+Now open VSCode and clone (`ctrl+shift+p'-> Search: 'Git Clone') a repo: https://github.com/TXSTCODEPLAYGROUND/CS4332SPRING2026.git
 This will prompt you to authenticate. Authenticate via browser loging.
 Note: Some folks might have other browser as default browser, but you might be logged in your GitHub account in different browser. Make sure this is not happening.
 
