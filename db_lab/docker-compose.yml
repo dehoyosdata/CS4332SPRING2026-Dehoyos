@@ -1,0 +1,49 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: lab-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+
+  postgres:
+    image: postgres:16
+    container_name: lab-postgres
+    restart: unless-stopped
+    ports:
+
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+
+  oracle:
+    image: gvenzl/oracle-free:23
+    container_name: lab-oracle
+    restart: unless-stopped
+    ports:
+      - "1521:1521"   # SQL*Net
+      - "5500:5500"   # optional web/EM endpoints depending on image
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD}
+      # Optional - depends on lab needs; see image docs for supported vars.
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./oracle/init:/container-entrypoint-initdb.d:ro
+
+volumes:
+  mysql_data:
+  pg_data:
+  oracle_data:
