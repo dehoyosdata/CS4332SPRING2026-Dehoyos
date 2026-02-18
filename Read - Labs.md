@@ -174,6 +174,11 @@ Navigate into the lab directory:
 cd db_lab
 ```
 
+Copy `.env.example` to `.env` and replace respective field:
+```bash
+cp .env.example .env
+```
+
 Start containers:
 
 ```bash
