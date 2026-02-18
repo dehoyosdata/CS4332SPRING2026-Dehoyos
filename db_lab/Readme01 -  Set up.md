@@ -103,6 +103,45 @@ INSERT INTO students VALUES
 (3, 'Carol', 'Physics');
 ```
 
+These queries are longer, so make sure you’ve completed **Readme00** and installed `vi`.
+
+If `vi` is installed, you can open the editor directly inside MySQL using:
+
+```sql
+\e
+```
+
+Write or modify your SQL in Vim, then save and exit with:
+
+```
+:wq
+```
+
+After returning to MySQL, ensure your query ends with a semicolon `;` to execute it.
+
+Alternatively, you can also write a sql query and save it as `.sql` and execute it.
+
+```bash
+ # Access the terminal session
+ docker exec -it lab-mysql bash
+ ```
+Now you can create a sql script here, may be using `vi`, e.g., 
+```sql
+-- script.sql
+SELECT * FROM students
+```
+Now login to sql 
+```bash
+mysql -u labuser -p # enter the password when prompted
+```
+Then you can do following
+```sql
+USE labdb; -- use labdb
+SOURCE script.sql --run script or ./ script.sql
+```
+
+
+
 ###### Query rows
 
 ```sql
