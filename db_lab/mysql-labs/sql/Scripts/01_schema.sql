@@ -1,12 +1,14 @@
+USE labdb;
+
 -- Drop tables in correct order (because of foreign keys)
 
-SET FOREIGN_KEY_CHECKS = 0; -- ???
+SET FOREIGN_KEY_CHECKS = 0; -- Disable foreign key checks so we can drop tables in any order without constraint errors
 
 DROP TABLE IF EXISTS students;
 DROP TABLE IF EXISTS courses;
 DROP TABLE IF EXISTS enrollments;
 
-SET FOREIGN_KEY_CHECKS = 1; -- ???
+SET FOREIGN_KEY_CHECKS = 1; -- Re-enable foreign key checks so constraints are enforced for all future operations
 
 
 -- Create students table
