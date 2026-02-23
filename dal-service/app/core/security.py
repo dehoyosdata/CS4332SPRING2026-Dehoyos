@@ -1,0 +1,12 @@
+"""Service-to-service authentication via x-api-key header."""
+
+from fastapi import Header, HTTPException
+
+from app.core.config import API_KEY
+
+
+async def require_service_key(x_api_key: str = Header(..., alias="x-api-key")) -> str:
+    """Dependency: require valid x-api-key header. Returns 401 if missing/invalid."""
+    if not x_api_key or x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Missing or invalid API key")
+    return x_api_key

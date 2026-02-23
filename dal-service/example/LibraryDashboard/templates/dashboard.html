@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Library{% endblock %}
+{% block body %}
+<div class="min-h-screen">
+  <nav class="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold text-slate-800">Library Dashboard</h1>
+    <div class="flex items-center gap-4">
+      <span class="text-slate-500 text-sm">{{ user.email }}</span>
+      <a href="{{ url_for('logout') }}" class="text-indigo-600 hover:underline text-sm">Logout</a>
+    </div>
+  </nav>
+
+  <main class="max-w-7xl mx-auto p-6 space-y-8">
+    <!-- Book lookup -->
+    <section class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+      <h2 class="text-lg font-semibold text-slate-800 mb-4">Look up book by ID</h2>
+      <form method="get" class="flex gap-3">
+        <input type="number" name="book_id" value="{{ book_id or '' }}" min="1" placeholder="e.g. 1"
+          class="px-4 py-2 rounded-lg border border-slate-200 w-32 focus:border-indigo-500 outline-none">
+        <button type="submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm font-medium">
+          Look up
+        </button>
+      </form>
+      {% if book_id %}
+        {% if book %}
+        <div class="mt-4 p-4 rounded-lg bg-slate-50">
+          <p class="font-medium text-slate-800">{{ book.title }}</p>
+          <p class="text-sm text-slate-500">ISBN: {{ book.isbn }} · Copies: {{ book.copies_available }}</p>
+        </div>
+        {% else %}
+        <p class="mt-4 text-amber-600 text-sm">Book not found.</p>
+        {% endif %}
+      {% endif %}
+    </section>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <p class="text-slate-500 text-sm">Active loans</p>
+        <p class="text-2xl font-bold text-indigo-600">{{ active_total }}</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <p class="text-slate-500 text-sm">Overdue loans</p>
+        <p class="text-2xl font-bold text-rose-600">{{ overdue_total }}</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <p class="text-slate-500 text-sm">Top late returns</p>
+        <p class="text-2xl font-bold text-slate-800">{{ bad_history|length }}</p>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <p class="text-slate-500 text-sm">Top on-time returns</p>
+        <p class="text-2xl font-bold text-slate-800">{{ good_history|length }}</p>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <h3 class="font-semibold text-slate-800 mb-4">Loans overview</h3>
+        <canvas id="loansChart" height="200"></canvas>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border p-6">
+        <h3 class="font-semibold text-slate-800 mb-4">Top late returns (bad history)</h3>
+        <canvas id="badChart" height="200"></canvas>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm border p-6">
+      <h3 class="font-semibold text-slate-800 mb-4">Top on-time returns (good history)</h3>
+      <canvas id="goodChart" height="150"></canvas>
+    </div>
+
+    <!-- Tables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-6 py-4 border-b flex justify-between items-center">
+          <h3 class="font-semibold text-slate-800">Active loans</h3>
+          {% if active_total > active_loans|length %}<span class="text-xs text-slate-500">Showing first {{ active_loans|length }} of {{ active_total }}</span>{% endif %}
+        </div>
+        <div class="overflow-x-auto max-h-64">
+          {% if active_loans %}
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50">
+              <tr><th class="text-left p-3">Book</th><th class="text-left p-3">Student ID</th><th class="text-left p-3">Due</th></tr>
+            </thead>
+            <tbody>
+              {% for loan in active_loans %}
+              <tr class="border-t"><td class="p-3">{{ loan.book_title }}</td><td class="p-3">{{ loan.student_id }}</td><td class="p-3">{{ loan.due_date[:10] }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="p-6 text-slate-500">No active loans.</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-6 py-4 border-b flex justify-between items-center">
+          <h3 class="font-semibold text-slate-800">Overdue loans</h3>
+          {% if overdue_total > overdue_loans|length %}<span class="text-xs text-slate-500">Showing first {{ overdue_loans|length }} of {{ overdue_total }}</span>{% endif %}
+        </div>
+        <div class="overflow-x-auto max-h-64">
+          {% if overdue_loans %}
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50">
+              <tr><th class="text-left p-3">Book</th><th class="text-left p-3">Student ID</th><th class="text-left p-3">Due</th></tr>
+            </thead>
+            <tbody>
+              {% for loan in overdue_loans %}
+              <tr class="border-t"><td class="p-3">{{ loan.book_title }}</td><td class="p-3">{{ loan.student_id }}</td><td class="p-3 text-rose-600">{{ loan.due_date[:10] }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <p class="p-6 text-slate-500">No overdue loans.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-6 py-4 border-b"><h3 class="font-semibold text-slate-800">Late returns (bad history)</h3></div>
+        <div class="overflow-x-auto max-h-64">
+          {% for item in bad_history[:5] %}
+          <div class="p-3 border-t flex justify-between">
+            <span>{{ item.student.name }}</span>
+            <span class="text-rose-600 font-medium">{{ item.late_count }} late</span>
+          </div>
+          {% else %}
+          <p class="p-6 text-slate-500">No data.</p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+        <div class="px-6 py-4 border-b"><h3 class="font-semibold text-slate-800">On-time returns (good history)</h3></div>
+        <div class="overflow-x-auto max-h-64">
+          {% for item in good_history[:5] %}
+          <div class="p-3 border-t flex justify-between">
+            <span>{{ item.student.name }}</span>
+            <span class="text-emerald-600 font-medium">{{ item.on_time_count }} on-time</span>
+          </div>
+          {% else %}
+          <p class="p-6 text-slate-500">No data.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  new Chart(document.getElementById('loansChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Active', 'Overdue'],
+      datasets: [{ data: [{{ active_total }}, {{ overdue_total }}], backgroundColor: ['#6366f1','#f43f5e'] }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+  var badLabels = {{ bad_history[:5]|map(attribute='student.name')|list|tojson }} || [];
+  var badData = {{ bad_history[:5]|map(attribute='late_count')|list|tojson }} || [];
+  if (badLabels.length) {
+    new Chart(document.getElementById('badChart'), {
+      type: 'bar',
+      data: { labels: badLabels, datasets: [{ label: 'Late returns', data: badData, backgroundColor: '#f43f5e' }] },
+      options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
+    });
+  }
+  var goodLabels = {{ good_history[:5]|map(attribute='student.name')|list|tojson }} || [];
+  var goodData = {{ good_history[:5]|map(attribute='on_time_count')|list|tojson }} || [];
+  if (goodLabels.length) {
+    new Chart(document.getElementById('goodChart'), {
+      type: 'bar',
+      data: { labels: goodLabels, datasets: [{ label: 'On-time returns', data: goodData, backgroundColor: '#10b981' }] },
+      options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
+    });
+  }
+</script>
+{% endblock %}
