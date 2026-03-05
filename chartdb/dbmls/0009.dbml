@@ -1,0 +1,386 @@
+// ===================================================
+// EXAMPLE 1 (>=20 tables): Chef Next Door
+// Concept: A marketplace where hosts can hire verified chefs to cook at home parties.
+// Flow (high level):
+// 1) A Host (customer) creates an Event (home party) with address, date/time, guest count.
+// 2) Host searches Chefs, views Chef profiles, menus, and availability.
+// 3) Host requests a Booking (hire a chef for the event). Chef accepts/declines.
+// 4) Booking may include a selected Menu, add-ons (staff, rentals), and a final Quote.
+// 5) Payments occur (deposit + final). Platform charges fees, pays chef via payouts.
+// 6) Post-event: Host leaves Review, reports issues, and support handles disputes.
+// Notes about ER representation in ChartDB:
+// - M:N relationships are represented via junction tables (e.g., chef_cuisines, booking_addons).
+// - "Weak entity" behavior is approximated using composite PKs that include the owner key
+//   (e.g., event_guest_list: (event_id, guest_no); booking_line_items: (booking_id, line_no)).
+// ===================================================
+
+// ----------------------- USERS & AUTH -----------------------
+Table users {
+  user_id int [pk, increment]
+  full_name varchar
+  email varchar [unique]
+  phone varchar
+  role varchar                  // "HOST", "CHEF", "STAFF", "ADMIN" (some users may be multi-role in real life)
+  status varchar                // "ACTIVE", "SUSPENDED"
+  created_at timestamp
+}
+
+Table edu_verifications {
+  // Optional: if platform wants special campus/partner verification later
+  verification_id int [pk, increment]
+  user_id int [not null]
+  verification_type varchar      // "EDU", "ID", "PHONE"
+  verified_at timestamp
+  status varchar                 // "PENDING","VERIFIED","REJECTED"
+}
+
+Table user_addresses {
+  address_id int [pk, increment]
+  user_id int [not null]
+  label varchar                  // "Home", "Work"
+  line1 varchar
+  city varchar
+  state varchar
+  zip varchar
+  country varchar
+  is_default boolean
+}
+
+// ----------------------- CHEF SIDE -----------------------
+Table chefs {
+  // Chef is a specialization of users (implemented as separate table + FK)
+  chef_id int [pk]               // matches users.user_id for 1:1 mapping
+  bio varchar
+  years_experience int
+  base_hourly_rate decimal
+  max_travel_miles int
+  food_safety_cert varchar       // e.g., ServSafe id
+}
+
+Table chef_portfolios {
+  portfolio_id int [pk, increment]
+  chef_id int [not null]
+  photo_url varchar
+  caption varchar
+  created_at timestamp
+}
+
+Table cuisines {
+  cuisine_id int [pk, increment]
+  name varchar [unique]          // e.g., "Italian", "Nepali", "Mexican"
+}
+
+Table chef_cuisines {
+  // M:N: a chef can cook multiple cuisines; each cuisine belongs to many chefs
+  chef_id int [not null]
+  cuisine_id int [not null]
+
+  Indexes {
+    (chef_id, cuisine_id) [pk]
+  }
+}
+
+Table dietary_tags {
+  tag_id int [pk, increment]
+  name varchar [unique]          // "Vegan", "Gluten-Free", "Halal"
+}
+
+Table chef_dietary_tags {
+  // M:N between chefs and dietary tags
+  chef_id int [not null]
+  tag_id int [not null]
+
+  Indexes {
+    (chef_id, tag_id) [pk]
+  }
+}
+
+Table chef_service_areas {
+  // Simple coverage: chef can serve in multiple zip codes/cities
+  area_id int [pk, increment]
+  chef_id int [not null]
+  city varchar
+  state varchar
+  zip varchar
+}
+
+// Availability is often complex; here we store time blocks the chef marks as available/unavailable.
+Table chef_availability_blocks {
+  block_id int [pk, increment]
+  chef_id int [not null]
+  start_time timestamp
+  end_time timestamp
+  block_type varchar             // "AVAILABLE", "UNAVAILABLE"
+  note varchar
+}
+
+// Menus and items
+Table menus {
+  menu_id int [pk, increment]
+  chef_id int [not null]
+  name varchar                   // e.g., "3-Course Italian Dinner"
+  description varchar
+  base_price_per_guest decimal
+  min_guests int
+  max_guests int
+  is_active boolean
+}
+
+Table menu_items {
+  item_id int [pk, increment]
+  menu_id int [not null]
+  name varchar                   // e.g., "Bruschetta"
+  course varchar                 // "APPETIZER","MAIN","DESSERT"
+  description varchar
+}
+
+Table menu_item_tags {
+  // M:N: menu items can have dietary tags
+  item_id int [not null]
+  tag_id int [not null]
+
+  Indexes {
+    (item_id, tag_id) [pk]
+  }
+}
+
+// Add-ons (extra services)
+Table addons {
+  addon_id int [pk, increment]
+  name varchar                   // "Sous-chef", "Bartender", "Tableware rental"
+  addon_type varchar             // "STAFF","RENTAL","SERVICE"
+  unit varchar                   // "hour","flat","per_guest"
+  base_price decimal
+  is_active boolean
+}
+
+Table chef_addons {
+  // M:N: chef offers certain add-ons (with possibly customized price)
+  chef_id int [not null]
+  addon_id int [not null]
+  chef_price_override decimal
+
+  Indexes {
+    (chef_id, addon_id) [pk]
+  }
+}
+
+// ----------------------- HOST EVENTS -----------------------
+Table events {
+  // Host creates an event (home party)
+  event_id int [pk, increment]
+  host_user_id int [not null]
+  event_name varchar
+  event_type varchar             // "BIRTHDAY","ANNIVERSARY","CASUAL_DINNER"
+  start_time timestamp
+  end_time timestamp
+  guest_count int
+  address_id int [not null]      // where chef will cook (event location)
+  notes varchar
+  created_at timestamp
+}
+
+Table event_guest_list {
+  // Weak-entity-like pattern: guests belong to an event
+  // Unique within event by guest_no (not globally unique)
+  event_id int [not null]
+  guest_no int [not null]
+  guest_name varchar
+  dietary_notes varchar
+
+  Indexes {
+    (event_id, guest_no) [pk]
+  }
+}
+
+// ----------------------- BOOKING & QUOTING -----------------------
+Table bookings {
+  // A booking is a request/contract between host and chef for an event
+  booking_id int [pk, increment]
+  event_id int [not null]
+  chef_id int [not null]
+  status varchar                 // "REQUESTED","ACCEPTED","DECLINED","CANCELLED","COMPLETED"
+  requested_at timestamp
+  accepted_at timestamp
+  cancelled_at timestamp
+  cancellation_reason varchar
+}
+
+Table booking_menu_selection {
+  // Host selects a menu for the booking (0..1 in this simplified version)
+  booking_id int [pk]
+  menu_id int [not null]
+  per_guest_price decimal        // snapshot for price stability
+}
+
+Table booking_addons {
+  // Selected add-ons for a booking (M:N booking-addon with attributes)
+  booking_id int [not null]
+  addon_id int [not null]
+  quantity int [not null]
+  unit_price decimal [not null]
+
+  Indexes {
+    (booking_id, addon_id) [pk]
+  }
+}
+
+Table booking_line_items {
+  // Weak-entity-like line items for a booking quote (useful for detailed invoices)
+  booking_id int [not null]
+  line_no int [not null]
+  description varchar
+  amount decimal [not null]
+
+  Indexes {
+    (booking_id, line_no) [pk]
+  }
+}
+
+Table quotes {
+  // A quote summarizes the pricing for a booking
+  quote_id int [pk, increment]
+  booking_id int [not null]
+  subtotal decimal
+  platform_fee decimal
+  taxes decimal
+  total decimal
+  currency varchar
+  created_at timestamp
+  status varchar                 // "DRAFT","SENT","ACCEPTED"
+}
+
+// ----------------------- PAYMENTS & PAYOUTS -----------------------
+Table payment_methods {
+  method_id int [pk, increment]
+  user_id int [not null]
+  provider varchar               // "STRIPE"
+  token varchar                  // stored token/identifier, not raw card data
+  label varchar                  // "Visa ending 1234"
+  created_at timestamp
+}
+
+Table payments {
+  payment_id int [pk, increment]
+  booking_id int [not null]
+  payer_user_id int [not null]   // host
+  method_id int
+  amount decimal
+  payment_type varchar           // "DEPOSIT","FINAL","REFUND"
+  status varchar                 // "PENDING","SUCCEEDED","FAILED"
+  paid_at timestamp
+}
+
+Table platform_fees {
+  // Fee breakdowns for analytics
+  fee_id int [pk, increment]
+  booking_id int [not null]
+  fee_type varchar               // "SERVICE_FEE","PROCESSING_FEE"
+  amount decimal
+}
+
+Table payouts {
+  // Platform pays chef after completion
+  payout_id int [pk, increment]
+  booking_id int [not null]
+  chef_id int [not null]
+  amount decimal
+  status varchar                 // "SCHEDULED","PAID","FAILED"
+  paid_at timestamp
+}
+
+// ----------------------- POST-EVENT: REVIEWS & SUPPORT -----------------------
+Table reviews {
+  review_id int [pk, increment]
+  booking_id int [not null]
+  host_user_id int [not null]
+  chef_id int [not null]
+  rating int                    // 1-5
+  comment varchar
+  created_at timestamp
+}
+
+Table messages {
+  // In-app chat between host and chef for a booking
+  message_id int [pk, increment]
+  booking_id int [not null]
+  sender_user_id int [not null]
+  body varchar
+  sent_at timestamp
+}
+
+Table disputes {
+  // Problems after or during service (late, no-show, quality, damage)
+  dispute_id int [pk, increment]
+  booking_id int [not null]
+  opened_by_user_id int [not null]
+  reason varchar
+  status varchar                // "OPEN","UNDER_REVIEW","RESOLVED"
+  opened_at timestamp
+  resolved_at timestamp
+}
+
+Table dispute_actions {
+  // Weak-entity-like actions within a dispute
+  dispute_id int [not null]
+  action_no int [not null]
+  action_type varchar            // "REFUND","CREDIT","WARNING"
+  amount decimal
+  note varchar
+  created_at timestamp
+
+  Indexes {
+    (dispute_id, action_no) [pk]
+  }
+}
+
+// ----------------------- REFERENCES -----------------------
+Ref: edu_verifications.user_id > users.user_id
+Ref: user_addresses.user_id > users.user_id
+
+Ref: chefs.chef_id > users.user_id
+Ref: chef_portfolios.chef_id > chefs.chef_id
+Ref: chef_cuisines.chef_id > chefs.chef_id
+Ref: chef_cuisines.cuisine_id > cuisines.cuisine_id
+Ref: chef_dietary_tags.chef_id > chefs.chef_id
+Ref: chef_dietary_tags.tag_id > dietary_tags.tag_id
+Ref: chef_service_areas.chef_id > chefs.chef_id
+Ref: chef_availability_blocks.chef_id > chefs.chef_id
+
+Ref: menus.chef_id > chefs.chef_id
+Ref: menu_items.menu_id > menus.menu_id
+Ref: menu_item_tags.item_id > menu_items.item_id
+Ref: menu_item_tags.tag_id > dietary_tags.tag_id
+
+Ref: chef_addons.chef_id > chefs.chef_id
+Ref: chef_addons.addon_id > addons.addon_id
+
+Ref: events.host_user_id > users.user_id
+Ref: events.address_id > user_addresses.address_id
+Ref: event_guest_list.event_id > events.event_id
+
+Ref: bookings.event_id > events.event_id
+Ref: bookings.chef_id > chefs.chef_id
+Ref: booking_menu_selection.booking_id > bookings.booking_id
+Ref: booking_menu_selection.menu_id > menus.menu_id
+Ref: booking_addons.booking_id > bookings.booking_id
+Ref: booking_addons.addon_id > addons.addon_id
+Ref: booking_line_items.booking_id > bookings.booking_id
+Ref: quotes.booking_id > bookings.booking_id
+
+Ref: payment_methods.user_id > users.user_id
+Ref: payments.booking_id > bookings.booking_id
+Ref: payments.payer_user_id > users.user_id
+Ref: payments.method_id > payment_methods.method_id
+Ref: platform_fees.booking_id > bookings.booking_id
+Ref: payouts.booking_id > bookings.booking_id
+Ref: payouts.chef_id > chefs.chef_id
+
+Ref: reviews.booking_id > bookings.booking_id
+Ref: reviews.host_user_id > users.user_id
+Ref: reviews.chef_id > chefs.chef_id
+Ref: messages.booking_id > bookings.booking_id
+Ref: messages.sender_user_id > users.user_id
+Ref: disputes.booking_id > bookings.booking_id
+Ref: disputes.opened_by_user_id > users.user_id
+Ref: dispute_actions.dispute_id > disputes.dispute_id

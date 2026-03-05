@@ -1,0 +1,66 @@
+// ---------------------------------------------------
+// COMPANY PROJECT MANAGEMENT DATABASE
+// ---------------------------------------------------
+// Models employees, departments, projects,
+// and assignments of employees to projects.
+// ---------------------------------------------------
+
+Table departments {
+  department_id int [pk, increment]   // department identifier
+  name varchar                        // department name
+}
+
+Table employees {
+  employee_id int [pk, increment]     // employee identifier
+  name varchar                        // employee name
+  email varchar                       // employee email
+  department_id int                   // department they belong to
+
+  // Each employee belongs to one department
+}
+
+Table projects {
+  project_id int [pk, increment]      // project identifier
+  name varchar                        // project name
+  budget decimal                      // project budget
+}
+
+Table assignments {
+  // Junction table representing employees working on projects.
+  // Resolves the many-to-many relationship.
+
+  employee_id int
+  project_id int
+  role varchar                        // role in the project (developer, analyst, etc.)
+  start_date date                     // when employee joined the project
+
+  Indexes {
+    (employee_id, project_id) [pk]    // prevents duplicate assignment entries
+  }
+}
+
+Table managers {
+  // This table represents which employee manages each project.
+
+  project_id int [pk]                 // each project has one manager
+  employee_id int                     // employee acting as the manager
+}
+
+// ---------------------------------------------------
+// RELATIONSHIPS
+// ---------------------------------------------------
+
+Ref: employees.department_id > departments.department_id
+// One department can have many employees
+
+Ref: assignments.employee_id > employees.employee_id
+// An employee can work on multiple projects
+
+Ref: assignments.project_id > projects.project_id
+// A project can have many employees
+
+Ref: managers.project_id > projects.project_id
+// Each project has one manager
+
+Ref: managers.employee_id > employees.employee_id
+// The manager must be an employee

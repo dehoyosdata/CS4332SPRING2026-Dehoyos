@@ -1,0 +1,447 @@
+// ===================================================
+// EXAMPLE 2 (>=20 tables): Campus Bazar
+// Concept: A campus-only marketplace for students/faculty to sell, rent, or exchange used items.
+// Key constraint: Verified .edu email is required to participate.
+// Flow (high level):
+// 1) A user signs up with a .edu email, completes verification, and creates a campus profile.
+// 2) Users create Listings for items: sale, rent, or exchange. Items have categories, condition, photos.
+// 3) Other users make Offers:
+//    - For sale: offer price, negotiate, then create an Order.
+//    - For rent: rental request with start/end dates, then create a Rental Contract.
+//    - For exchange: propose trade items and finalize an Exchange Agreement.
+// 4) Meetups happen on campus: pickup/return points with scheduled times.
+// 5) Payments may be used (optional). Deposits for rentals are common.
+// 6) After completion: ratings, disputes, moderation.
+// Notes about ER representation in ChartDB:
+// - M:N relationships use junction tables (listing_tags, listing_photos, exchange_trade_items).
+// - "Weak entities" use composite PKs including owner id (order_line_items, rental_events).
+// ===================================================
+
+// ----------------------- USERS & CAMPUS VERIFICATION -----------------------
+Table users {
+  user_id int [pk, increment]
+  full_name varchar
+  edu_email varchar [unique]       // must be .edu in application logic
+  phone varchar
+  status varchar                   // "ACTIVE","SUSPENDED"
+  created_at timestamp
+}
+
+Table edu_email_verifications {
+  verification_id int [pk, increment]
+  user_id int [not null]
+  sent_to_email varchar
+  token_hash varchar
+  sent_at timestamp
+  verified_at timestamp
+  status varchar                   // "PENDING","VERIFIED","EXPIRED"
+}
+
+Table campuses {
+  campus_id int [pk, increment]
+  name varchar
+  city varchar
+  state varchar
+}
+
+Table campus_profiles {
+  // 1:1-ish with users; stores campus affiliation and visibility preferences
+  user_id int [pk]
+  campus_id int [not null]
+  affiliation varchar              // "STUDENT","FACULTY","STAFF","ALUM"
+  grad_year int
+  display_name varchar
+  bio varchar
+  is_public boolean
+}
+
+Table user_locations {
+  // Saved meetup spots for user (dorm, building, etc.)
+  location_id int [pk, increment]
+  user_id int [not null]
+  campus_id int [not null]
+  label varchar
+  building varchar
+  details varchar
+  is_default boolean
+}
+
+// ----------------------- CATALOG: ITEMS, CATEGORIES, TAGS -----------------------
+Table categories {
+  category_id int [pk, increment]
+  name varchar [unique]           // "Electronics", "Furniture", "Books"
+}
+
+Table item_conditions {
+  condition_id int [pk, increment]
+  name varchar [unique]           // "New", "Like New", "Good", "Fair"
+}
+
+Table tags {
+  tag_id int [pk, increment]
+  name varchar [unique]           // "Calculator", "iClicker", "Bike"
+}
+
+Table items {
+  // An item is a reusable definition (optional); a listing can reference one item record.
+  item_id int [pk, increment]
+  owner_user_id int [not null]
+  title varchar
+  description varchar
+  category_id int [not null]
+  condition_id int [not null]
+  created_at timestamp
+}
+
+Table item_photos {
+  // Weak-entity-like: photos belong to an item; unique by photo_no within item
+  item_id int [not null]
+  photo_no int [not null]
+  url varchar
+  uploaded_at timestamp
+
+  Indexes {
+    (item_id, photo_no) [pk]
+  }
+}
+
+// ----------------------- LISTINGS (SALE / RENT / EXCHANGE) -----------------------
+Table listings {
+  listing_id int [pk, increment]
+  seller_user_id int [not null]
+  campus_id int [not null]
+  item_id int [not null]
+  listing_type varchar             // "SALE","RENT","EXCHANGE"
+  status varchar                   // "ACTIVE","PAUSED","CLOSED"
+  posted_at timestamp
+}
+
+Table sale_terms {
+  // 0..1 table depending on listing_type
+  listing_id int [pk]
+  asking_price decimal
+  currency varchar
+  allow_offers boolean
+}
+
+Table rental_terms {
+  listing_id int [pk]
+  price_per_day decimal
+  min_days int
+  max_days int
+  security_deposit decimal
+  late_fee_per_day decimal
+}
+
+Table exchange_terms {
+  listing_id int [pk]
+  desired_description varchar       // "Looking for a mini-fridge or desk chair"
+}
+
+Table listing_tags {
+  // M:N listing-tag
+  listing_id int [not null]
+  tag_id int [not null]
+
+  Indexes {
+    (listing_id, tag_id) [pk]
+  }
+}
+
+Table listing_photos {
+  // Weak-entity-like photos for listings (separate from item_photos to allow listing-specific photos)
+  listing_id int [not null]
+  photo_no int [not null]
+  url varchar
+  uploaded_at timestamp
+
+  Indexes {
+    (listing_id, photo_no) [pk]
+  }
+}
+
+// ----------------------- OFFERS & NEGOTIATION -----------------------
+Table offers {
+  // A buyer/renter/trader submits an offer against a listing
+  offer_id int [pk, increment]
+  listing_id int [not null]
+  buyer_user_id int [not null]
+  offer_type varchar               // "SALE_OFFER","RENT_REQUEST","EXCHANGE_PROPOSAL"
+  status varchar                   // "SENT","ACCEPTED","REJECTED","WITHDRAWN"
+  created_at timestamp
+}
+
+Table offer_messages {
+  // Weak-entity-like message thread per offer
+  offer_id int [not null]
+  msg_no int [not null]
+  sender_user_id int [not null]
+  body varchar
+  sent_at timestamp
+
+  Indexes {
+    (offer_id, msg_no) [pk]
+  }
+}
+
+Table offer_price_proposals {
+  // For sales negotiation: multiple proposals per offer
+  proposal_id int [pk, increment]
+  offer_id int [not null]
+  proposed_price decimal
+  proposed_at timestamp
+  proposed_by_user_id int [not null]
+}
+
+// ----------------------- SALE ORDER (if sale offer accepted) -----------------------
+Table orders {
+  order_id int [pk, increment]
+  offer_id int [not null]          // links back to accepted offer
+  listing_id int [not null]
+  buyer_user_id int [not null]
+  seller_user_id int [not null]
+  status varchar                   // "PENDING_PAYMENT","PAID","COMPLETED","CANCELLED"
+  created_at timestamp
+}
+
+Table order_line_items {
+  // Weak-entity-like: line items within an order
+  order_id int [not null]
+  line_no int [not null]
+  description varchar
+  amount decimal
+
+  Indexes {
+    (order_id, line_no) [pk]
+  }
+}
+
+Table payments {
+  payment_id int [pk, increment]
+  order_id int
+  payer_user_id int [not null]
+  amount decimal
+  status varchar                   // "SUCCEEDED","FAILED","REFUNDED"
+  paid_at timestamp
+}
+
+// ----------------------- RENTAL CONTRACT (if rental request accepted) -----------------------
+Table rental_contracts {
+  rental_id int [pk, increment]
+  offer_id int [not null]
+  listing_id int [not null]
+  renter_user_id int [not null]
+  owner_user_id int [not null]
+  start_date date
+  end_date date
+  deposit_amount decimal
+  status varchar                   // "ACTIVE","RETURNED","LATE","CANCELLED"
+  created_at timestamp
+}
+
+Table rental_events {
+  // Weak-entity-like: events for rental lifecycle (pickup, return, extension, late notice)
+  rental_id int [not null]
+  event_no int [not null]
+  event_type varchar               // "PICKUP","RETURN","EXTENSION","LATE_NOTICE"
+  event_time timestamp
+  note varchar
+
+  Indexes {
+    (rental_id, event_no) [pk]
+  }
+}
+
+Table rental_payments {
+  rental_payment_id int [pk, increment]
+  rental_id int [not null]
+  payer_user_id int [not null]
+  payment_type varchar             // "DEPOSIT","RENT","LATE_FEE","REFUND"
+  amount decimal
+  status varchar
+  paid_at timestamp
+}
+
+// ----------------------- EXCHANGE AGREEMENT (if exchange proposal accepted) -----------------------
+Table exchange_agreements {
+  exchange_id int [pk, increment]
+  offer_id int [not null]
+  listing_id int [not null]
+  proposer_user_id int [not null]   // person who initiated the exchange
+  owner_user_id int [not null]      // listing owner
+  status varchar                    // "AGREED","COMPLETED","CANCELLED"
+  agreed_at timestamp
+}
+
+Table exchange_trade_items {
+  // M:N-like within one exchange: each side can offer multiple items.
+  exchange_id int [not null]
+  side varchar                      // "PROPOSER" or "OWNER"
+  item_id int [not null]
+
+  Indexes {
+    (exchange_id, side, item_id) [pk]
+  }
+}
+
+// ----------------------- MEETUPS (PICKUP / RETURN / EXCHANGE HANDOFF) -----------------------
+Table meetup_points {
+  point_id int [pk, increment]
+  campus_id int [not null]
+  name varchar                      // "LBJ Student Center", "Library Entrance"
+  building varchar
+  details varchar
+}
+
+Table meetups {
+  meetup_id int [pk, increment]
+  campus_id int [not null]
+  point_id int [not null]
+  scheduled_at timestamp
+  status varchar                    // "SCHEDULED","DONE","NO_SHOW","CANCELLED"
+  created_at timestamp
+}
+
+Table meetup_participants {
+  // M:N between meetups and users
+  meetup_id int [not null]
+  user_id int [not null]
+  role varchar                      // "BUYER","SELLER","RENTER","OWNER"
+
+  Indexes {
+    (meetup_id, user_id) [pk]
+  }
+}
+
+// Attach a meetup to a transaction type (sale order, rental, exchange) using separate link tables
+Table order_meetups {
+  order_id int [not null]
+  meetup_id int [not null]
+
+  Indexes {
+    (order_id, meetup_id) [pk]
+  }
+}
+
+Table rental_meetups {
+  rental_id int [not null]
+  meetup_id int [not null]
+  meetup_type varchar               // "PICKUP","RETURN"
+
+  Indexes {
+    (rental_id, meetup_id) [pk]
+  }
+}
+
+Table exchange_meetups {
+  exchange_id int [not null]
+  meetup_id int [not null]
+
+  Indexes {
+    (exchange_id, meetup_id) [pk]
+  }
+}
+
+// ----------------------- TRUST: RATINGS, REPORTS, MODERATION -----------------------
+Table ratings {
+  rating_id int [pk, increment]
+  from_user_id int [not null]
+  to_user_id int [not null]
+  context_type varchar              // "ORDER","RENTAL","EXCHANGE"
+  context_id int [not null]         // stores the id from the relevant table
+  stars int                         // 1..5
+  comment varchar
+  created_at timestamp
+}
+
+Table reports {
+  report_id int [pk, increment]
+  reporter_user_id int [not null]
+  reported_user_id int
+  listing_id int
+  reason varchar
+  status varchar                    // "OPEN","REVIEWED","ACTIONED"
+  created_at timestamp
+}
+
+Table moderation_actions {
+  action_id int [pk, increment]
+  report_id int [not null]
+  action_type varchar               // "WARN","SUSPEND","REMOVE_LISTING"
+  note varchar
+  created_at timestamp
+}
+
+// ----------------------- REFERENCES -----------------------
+Ref: edu_email_verifications.user_id > users.user_id
+Ref: campus_profiles.user_id > users.user_id
+Ref: campus_profiles.campus_id > campuses.campus_id
+Ref: user_locations.user_id > users.user_id
+Ref: user_locations.campus_id > campuses.campus_id
+
+Ref: items.owner_user_id > users.user_id
+Ref: items.category_id > categories.category_id
+Ref: items.condition_id > item_conditions.condition_id
+Ref: item_photos.item_id > items.item_id
+
+Ref: listings.seller_user_id > users.user_id
+Ref: listings.campus_id > campuses.campus_id
+Ref: listings.item_id > items.item_id
+
+Ref: sale_terms.listing_id > listings.listing_id
+Ref: rental_terms.listing_id > listings.listing_id
+Ref: exchange_terms.listing_id > listings.listing_id
+
+Ref: listing_tags.listing_id > listings.listing_id
+Ref: listing_tags.tag_id > tags.tag_id
+Ref: listing_photos.listing_id > listings.listing_id
+
+Ref: offers.listing_id > listings.listing_id
+Ref: offers.buyer_user_id > users.user_id
+Ref: offer_messages.offer_id > offers.offer_id
+Ref: offer_messages.sender_user_id > users.user_id
+Ref: offer_price_proposals.offer_id > offers.offer_id
+Ref: offer_price_proposals.proposed_by_user_id > users.user_id
+
+Ref: orders.offer_id > offers.offer_id
+Ref: orders.listing_id > listings.listing_id
+Ref: orders.buyer_user_id > users.user_id
+Ref: orders.seller_user_id > users.user_id
+Ref: order_line_items.order_id > orders.order_id
+Ref: payments.order_id > orders.order_id
+Ref: payments.payer_user_id > users.user_id
+
+Ref: rental_contracts.offer_id > offers.offer_id
+Ref: rental_contracts.listing_id > listings.listing_id
+Ref: rental_contracts.renter_user_id > users.user_id
+Ref: rental_contracts.owner_user_id > users.user_id
+Ref: rental_events.rental_id > rental_contracts.rental_id
+Ref: rental_payments.rental_id > rental_contracts.rental_id
+Ref: rental_payments.payer_user_id > users.user_id
+
+Ref: exchange_agreements.offer_id > offers.offer_id
+Ref: exchange_agreements.listing_id > listings.listing_id
+Ref: exchange_agreements.proposer_user_id > users.user_id
+Ref: exchange_agreements.owner_user_id > users.user_id
+Ref: exchange_trade_items.exchange_id > exchange_agreements.exchange_id
+Ref: exchange_trade_items.item_id > items.item_id
+
+Ref: meetup_points.campus_id > campuses.campus_id
+Ref: meetups.campus_id > campuses.campus_id
+Ref: meetups.point_id > meetup_points.point_id
+Ref: meetup_participants.meetup_id > meetups.meetup_id
+Ref: meetup_participants.user_id > users.user_id
+
+Ref: order_meetups.order_id > orders.order_id
+Ref: order_meetups.meetup_id > meetups.meetup_id
+Ref: rental_meetups.rental_id > rental_contracts.rental_id
+Ref: rental_meetups.meetup_id > meetups.meetup_id
+Ref: exchange_meetups.exchange_id > exchange_agreements.exchange_id
+Ref: exchange_meetups.meetup_id > meetups.meetup_id
+
+Ref: ratings.from_user_id > users.user_id
+Ref: ratings.to_user_id > users.user_id
+Ref: reports.reporter_user_id > users.user_id
+Ref: reports.reported_user_id > users.user_id
+Ref: reports.listing_id > listings.listing_id
+Ref: moderation_actions.report_id > reports.report_id

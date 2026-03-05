@@ -1,0 +1,24 @@
+Table students {
+  student_id int [pk, increment]
+  name varchar
+  email varchar [unique]
+}
+
+Table courses {
+  course_id int [pk, increment]
+  code varchar [unique]
+  title varchar
+}
+
+Table enrollments {
+  student_id int [not null]
+  course_id int [not null]
+  enrolled_at timestamp
+
+  Indexes {
+    (student_id, course_id) [pk]
+  }
+}
+
+Ref: enrollments.student_id > students.student_id
+Ref: enrollments.course_id > courses.course_id

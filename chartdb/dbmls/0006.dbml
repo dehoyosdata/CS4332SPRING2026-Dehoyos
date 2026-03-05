@@ -1,0 +1,113 @@
+// ===================================================
+// EXAMPLE A (10 tables): E-COMMERCE + INVENTORY + SHIPPING
+// Goal: Showcase multiple M:N relationships, weak-entity-like composite keys,
+//       and relationship attributes stored in junction tables.
+// ===================================================
+
+// ---------- CORE ENTITIES ----------
+Table customers {
+  customer_id int [pk, increment]   // strong entity
+  name varchar
+  email varchar [unique]
+  created_at timestamp
+}
+
+Table addresses {
+  address_id int [pk, increment]
+  customer_id int [not null]        // a customer can store multiple addresses (1:N)
+  line1 varchar
+  city varchar
+  state varchar
+  zip varchar
+  country varchar
+  is_default boolean
+}
+
+Table categories {
+  category_id int [pk, increment]
+  name varchar [unique]
+}
+
+Table products {
+  product_id int [pk, increment]
+  sku varchar [unique]              // stable identifier used in commerce
+  name varchar
+  category_id int [not null]        // product belongs to one category (N:1)
+  list_price decimal
+  is_active boolean
+}
+
+// ---------- SALES FLOW ----------
+Table orders {
+  order_id int [pk, increment]
+  customer_id int [not null]        // customer places many orders (1:N)
+  ship_to_address_id int [not null] // snapshot: which address used for shipping
+  order_status varchar              // e.g., "PLACED", "PAID", "SHIPPED"
+  placed_at timestamp
+}
+
+Table order_items {
+  // Junction-like table: orders M:N products
+  // Also stores relationship attributes: quantity, unit_price_at_purchase.
+  order_id int [not null]
+  product_id int [not null]
+  quantity int [not null]
+  unit_price decimal [not null]
+
+  Indexes {
+    (order_id, product_id) [pk]     // composite PK prevents duplicate product rows per order
+  }
+}
+
+// ---------- PAYMENTS ----------
+Table payments {
+  payment_id int [pk, increment]
+  order_id int [not null]           // an order can have multiple payment attempts (1:N)
+  provider varchar                  // e.g., Stripe
+  amount decimal
+  status varchar                    // e.g., "AUTHORIZED", "CAPTURED", "FAILED"
+  paid_at timestamp
+}
+
+// ---------- WAREHOUSE + INVENTORY ----------
+Table warehouses {
+  warehouse_id int [pk, increment]
+  name varchar
+  city varchar
+  state varchar
+}
+
+Table inventory {
+  // M:N between warehouses and products with a quantity attribute.
+  warehouse_id int [not null]
+  product_id int [not null]
+  on_hand int [not null]
+
+  Indexes {
+    (warehouse_id, product_id) [pk] // composite PK: one inventory record per (warehouse, product)
+  }
+}
+
+// ---------- SHIPPING ----------
+Table shipments {
+  shipment_id int [pk, increment]
+  order_id int [not null]           // order can be split into multiple shipments (1:N)
+  warehouse_id int [not null]       // shipment originates from one warehouse (N:1)
+  carrier varchar                   // e.g., UPS
+  tracking_number varchar [unique]
+  shipped_at timestamp
+  delivered_at timestamp
+}
+
+// ---------- RELATIONSHIPS ----------
+Ref: addresses.customer_id > customers.customer_id
+Ref: products.category_id > categories.category_id
+Ref: orders.customer_id > customers.customer_id
+Ref: orders.ship_to_address_id > addresses.address_id
+Ref: order_items.order_id > orders.order_id
+Ref: order_items.product_id > products.product_id
+Ref: payments.order_id > orders.order_id
+Ref: inventory.warehouse_id > warehouses.warehouse_id
+Ref: inventory.product_id > products.product_id
+Ref: shipments.order_id > orders.order_id
+Ref: shipments.warehouse_id > warehouses.warehouse_id
