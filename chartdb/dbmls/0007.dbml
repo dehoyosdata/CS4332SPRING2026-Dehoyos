@@ -1,0 +1,111 @@
+// ===================================================
+// EXAMPLE B (10 tables): UNIVERSITY + RESEARCH + CITATIONS
+// Goal: Showcase multiple M:N relationships, self-referencing relationships,
+//       and "role/attribute on relationship" patterns.
+// ===================================================
+
+// ---------- CORE ENTITIES ----------
+Table departments {
+  department_id int [pk, increment]
+  name varchar [unique]
+}
+
+Table students {
+  student_id int [pk, increment]
+  name varchar
+  email varchar [unique]
+  department_id int [not null]      // major department
+  level varchar                     // UG/MS/PhD
+}
+
+Table instructors {
+  instructor_id int [pk, increment]
+  name varchar
+  email varchar [unique]
+  department_id int [not null]
+}
+
+Table courses {
+  course_id int [pk, increment]
+  code varchar [unique]             // e.g., CS4332
+  title varchar
+  credits int
+  department_id int [not null]
+}
+
+// ---------- TEACHING (M:N instructor-course by semester/section) ----------
+Table course_offerings {
+  // Represents a course offered in a specific term and section.
+  offering_id int [pk, increment]
+  course_id int [not null]
+  term varchar                      // e.g., "SPRING 2026"
+  section varchar                   // e.g., "001"
+  room varchar
+  schedule varchar                  // e.g., "MW 2:00-3:15"
+}
+
+Table teaching_assignments {
+  // M:N: instructors can teach multiple offerings; co-teaching is possible.
+  offering_id int [not null]
+  instructor_id int [not null]
+  role varchar                      // e.g., "PRIMARY", "CO-INSTRUCTOR"
+
+  Indexes {
+    (offering_id, instructor_id) [pk]
+  }
+}
+
+// ---------- ENROLLMENT (M:N student-offering with attributes) ----------
+Table enrollments {
+  student_id int [not null]
+  offering_id int [not null]
+  enrolled_at timestamp
+  grade varchar
+
+  Indexes {
+    (student_id, offering_id) [pk]
+  }
+}
+
+// ---------- RESEARCH (papers + authorship + citations) ----------
+Table papers {
+  paper_id int [pk, increment]
+  title varchar
+  year int
+  venue varchar
+}
+
+Table paper_authorships {
+  // M:N between instructors and papers (for simplicity; could also include students).
+  instructor_id int [not null]
+  paper_id int [not null]
+  author_order int [not null]
+
+  Indexes {
+    (instructor_id, paper_id) [pk]
+  }
+}
+
+Table citations {
+  // Self-referencing M:N on papers: a paper cites many papers, and is cited by many.
+  citing_paper_id int [not null]
+  cited_paper_id int [not null]
+
+  Indexes {
+    (citing_paper_id, cited_paper_id) [pk]
+  }
+}
+
+// ---------- RELATIONSHIPS ----------
+Ref: students.department_id > departments.department_id
+Ref: instructors.department_id > departments.department_id
+Ref: courses.department_id > departments.department_id
+Ref: course_offerings.course_id > courses.course_id
+Ref: teaching_assignments.offering_id > course_offerings.offering_id
+Ref: teaching_assignments.instructor_id > instructors.instructor_id
+Ref: enrollments.student_id > students.student_id
+Ref: enrollments.offering_id > course_offerings.offering_id
+Ref: paper_authorships.instructor_id > instructors.instructor_id
+Ref: paper_authorships.paper_id > papers.paper_id
+Ref: citations.citing_paper_id > papers.paper_id
+Ref: citations.cited_paper_id > papers.paper_id

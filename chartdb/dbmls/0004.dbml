@@ -1,0 +1,63 @@
+// ---------------------------------------------------
+// E-COMMERCE DATABASE
+// ---------------------------------------------------
+// Models customers placing orders containing products.
+// Products belong to categories.
+// ---------------------------------------------------
+
+Table customers {
+  customer_id int [pk, increment]     // unique customer identifier
+  name varchar                        // customer name
+  email varchar [unique]              // unique email address
+  created_at timestamp                // account creation time
+}
+
+Table orders {
+  order_id int [pk, increment]        // unique order identifier
+  order_date timestamp                // when the order was placed
+  customer_id int                     // customer who placed the order
+
+  // One customer can have many orders
+}
+
+Table products {
+  product_id int [pk, increment]      // product identifier
+  name varchar                        // product name
+  price decimal                       // price per unit
+  category_id int                     // category the product belongs to
+}
+
+Table categories {
+  category_id int [pk, increment]     // category identifier
+  name varchar                        // category name
+}
+
+Table order_items {
+  // Junction table resolving many-to-many relationship
+  // between orders and products.
+
+  order_id int
+  product_id int
+  quantity int                        // number of items purchased
+  unit_price decimal                  // price at purchase time
+
+  Indexes {
+    (order_id, product_id) [pk]       // prevents duplicate product entries in the same order
+  }
+}
+
+// ---------------------------------------------------
+// RELATIONSHIPS
+// ---------------------------------------------------
+
+Ref: orders.customer_id > customers.customer_id
+// One customer can place many orders
+
+Ref: products.category_id > categories.category_id
+// Each product belongs to one category
+
+Ref: order_items.order_id > orders.order_id
+// An order can contain multiple products
+
+Ref: order_items.product_id > products.product_id
+// A product can appear in many orders

@@ -1,0 +1,65 @@
+// ---------------------------------------------------
+// UNIVERSITY RESEARCH DATABASE
+// ---------------------------------------------------
+// This schema models researchers, their institutions,
+// papers they publish, and grants awarded to institutions.
+// ---------------------------------------------------
+
+Table institutions {
+  institution_id int [pk, increment]  // unique identifier for each institution
+  name varchar                        // institution name
+  country varchar                     // country where the institution is located
+}
+
+Table researchers {
+  researcher_id int [pk, increment]   // unique researcher identifier
+  name varchar                        // researcher's full name
+  email varchar [unique]              // each researcher has a unique email
+  field varchar                       // research specialization
+  institution_id int                  // foreign key referencing the institution
+
+  // Each researcher belongs to one institution
+}
+
+Table papers {
+  paper_id int [pk, increment]        // unique paper identifier
+  title varchar                       // title of the research paper
+  year int                            // publication year
+  conference varchar                  // conference or venue
+}
+
+Table authorships {
+  // This table resolves the many-to-many relationship
+  // between researchers and papers.
+
+  researcher_id int
+  paper_id int
+  author_order int                    // order of authorship in the paper
+
+  Indexes {
+    (researcher_id, paper_id) [pk]    // composite primary key
+  }
+}
+
+Table grants {
+  grant_id int [pk, increment]        // grant identifier
+  title varchar                       // grant title
+  amount decimal                      // funding amount
+  institution_id int                  // institution receiving the grant
+}
+
+// ---------------------------------------------------
+// RELATIONSHIPS
+// ---------------------------------------------------
+
+Ref: researchers.institution_id > institutions.institution_id
+// One institution can employ many researchers
+
+Ref: authorships.researcher_id > researchers.researcher_id
+// A researcher can author many papers
+
+Ref: authorships.paper_id > papers.paper_id
+// A paper can have multiple researchers (authors)
+
+Ref: grants.institution_id > institutions.institution_id
+// Institutions receive multiple grants

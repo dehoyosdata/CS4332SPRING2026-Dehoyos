@@ -1,0 +1,25 @@
+Table authors {
+  author_id int [pk, increment]
+  name varchar
+  email varchar [unique]
+}
+
+Table papers {
+  paper_id int [pk, increment]
+  title varchar
+  year int
+}
+
+Table authorships {
+  author_id int [not null]
+  paper_id int [not null]
+  author_order int [not null]
+  is_corresponding boolean
+
+  Indexes {
+    (author_id, paper_id) [pk]
+  }
+}
+
+Ref: authorships.author_id > authors.author_id
+Ref: authorships.paper_id > papers.paper_id
